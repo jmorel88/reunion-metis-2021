@@ -1,0 +1,20 @@
+{
+  "name": "r-metis",
+  "version": "0.0.0",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "serve": "vite preview"
+  },
+  "devDependencies": {
+    "vite": "^2.6.4"
+  },
+  "dependencies": {
+    "@tensorflow-models/pose-detection": "^0.0.6",
+    "@tensorflow/tfjs-backend-webgl": "^3.9.0",
+    "@tensorflow/tfjs-converter": "^3.9.0",
+    "@tensorflow/tfjs-core": "^3.9.0",
+    "ogl": "^0.0.76",
+    "stats.js": "^0.17.0"
+  }
+}

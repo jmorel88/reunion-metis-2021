@@ -1,0 +1,48 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="favicon.svg" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Réunion Metis</title>
+    <style>
+      * {
+        margin: 0;
+        padding: 0;
+      }
+      video {
+        /* opacity: 0; */
+        pointer-events: 0;
+        width: 100%;
+        object-fit: cover;
+        object-position: center;
+        transform: scaleX(-1);
+      }
+      #canvas {
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        z-index: 999;
+        transform: scaleX(-1);
+      }
+      img {
+        width: 10vw;
+      }
+      #pause {
+        position: absolute;
+        top: 0;
+        right: 0;
+        width: 100px;
+        height: 42px;
+        z-index: 999;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="canvas"></canvas>
+    <button id="pause">Reset</button>
+    <video id="video" controls muted autoplay></video>
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>
