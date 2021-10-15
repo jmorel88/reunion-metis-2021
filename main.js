@@ -48,11 +48,11 @@ document.body.appendChild(stats.dom);
    * load flower images
    */
   const images = [
-    `/textures/flower-1.png`,
-    `/textures/flower-2.png`,
-    `/textures/flower-3.png`,
-    `/textures/flower-4.png`,
-    `/textures/flower-5.png`,
+    `/flower-1.png`,
+    `/flower-2.png`,
+    `/flower-3.png`,
+    `/flower-4.png`,
+    `/flower-5.png`,
   ];
 
   const loadImage = (src) => {
