@@ -2,21 +2,15 @@ import * as poseDetection from "@tensorflow-models/pose-detection";
 import "@tensorflow/tfjs-backend-webgl";
 import Stats from "stats.js";
 import gsap from "gsap";
-import {
-  Renderer,
-  Plane,
-  Program,
-  Mesh,
-  Texture,
-  Camera,
-  Transform,
-} from "ogl";
+import * as THREE from "three";
+import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
+import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader";
 
-const testing = false;
+const testing = true;
 
 const stats = new Stats();
 stats.showPanel(0);
-//document.body.appendChild(stats.dom);
+document.body.appendChild(stats.dom);
 
 const mapRange = (value, inMin, inMax, outMin, outMax) => {
   return ((value - inMin) * (outMax - outMin)) / (inMax - inMin) + outMin;
@@ -50,40 +44,16 @@ const mapRange = (value, inMin, inMax, outMin, outMax) => {
 
   const visiblePeople = [];
 
+  const raycaster = new THREE.Raycaster();
+
   /**
    * Stream camera to video
    */
-  const video = document.getElementById("video");
-  const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-  video.srcObject = stream;
-
-  /**
-   * load flower images
-   */
-  const images = [
-    `/flower-1.png`,
-    `/flower-2.png`,
-    `/flower-3.png`,
-    `/flower-4.png`,
-    `/flower-5.png`,
-  ];
-
-  const loadImage = (src) => {
-    return new Promise((resolve) => {
-      const image = new Image();
-      image.width = 50;
-      image.height = 50;
-      image.onload = () => resolve(image);
-      image.src = src;
-    });
-  };
-
-  const loadImages = async (arrayOfImages) => {
-    const unresolvedImages = arrayOfImages.map(loadImage);
-    return await Promise.all(unresolvedImages);
-  };
-
-  const flowers = await loadImages(images);
+  if (!testing) {
+    const video = document.getElementById("video");
+    const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+    video.srcObject = stream;
+  }
 
   /**
    * WebGL
@@ -91,32 +61,33 @@ const mapRange = (value, inMin, inMax, outMin, outMax) => {
   const canvas = document.getElementById("canvas");
 
   // renderer
-  const renderer = new Renderer({
+  const renderer = new THREE.WebGLRenderer({
     canvas: canvas,
-    width: viewport.width,
-    height: viewport.height,
   });
-
-  const gl = renderer.gl;
-
-  // camera
-  const camera = new Camera(gl);
-  camera.fov = 45;
-  camera.position.z = 5;
+  renderer.setSize(viewport.width, viewport.height);
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 
   // scene
-  const scene = new Transform();
+  const scene = new THREE.Scene();
 
-  // resize
+  // camera
+  const camera = new THREE.PerspectiveCamera(
+    45,
+    viewport.width / viewport.height,
+    1,
+    1000
+  );
+
+  camera.position.z = 5;
+
   function resize() {
     viewport.width = window.innerWidth;
     viewport.height = window.innerHeight;
 
     renderer.setSize(viewport.width, viewport.height);
 
-    camera.perspective({
-      aspect: gl.canvas.width / gl.canvas.height,
-    });
+    camera.aspect = canvas.width / canvas.height;
+    camera.updateProjectionMatrix();
 
     const fov = camera.fov * (Math.PI / 180);
     const height = 2 * Math.tan(fov / 2) * camera.position.z;
@@ -130,67 +101,119 @@ const mapRange = (value, inMin, inMax, outMin, outMax) => {
   resizer.observe(document.body);
   resize();
 
-  // gemetry
-  const geometry = new Plane(gl, {
-    width: 0.5,
-    height: 0.5,
-  });
+  // light
+  const ambientLight = new THREE.AmbientLight(0xffffff, 0.8);
+  scene.add(ambientLight);
 
-  // textures
-  const flowerTextures = flowers.map((flower) => {
-    const texture = new Texture(gl, {
-      generateMipmaps: false,
+  // model loader
+  const gltfLoader = new GLTFLoader();
+  const dracoLoader = new DRACOLoader();
+  dracoLoader.setDecoderPath("/draco/");
+  gltfLoader.setDRACOLoader(dracoLoader);
+
+  // texture loader
+  const textureLoader = new THREE.TextureLoader();
+
+  function createTextureSets(flowerSourcesArray) {
+    return flowerSourcesArray.map((flower) => {
+      const texture = textureLoader.load(flower);
+      texture.generateMipmaps = false;
+      texture.minFilter = THREE.NearestFilter;
+      texture.magFilter = THREE.NearestFilter;
+      return texture;
     });
+  }
 
-    texture.image = flower;
+  const flowerSetOneSources = [
+    `/flower-3.png`,
+    `/flower-4.png`,
+    `/flower-5.png`,
+  ];
 
-    return texture;
-  });
+  const flowerSetTwoSources = [
+    `/flower-1.png`,
+    `/flower-2.png`,
+    `/flower-3.png`,
+  ];
 
-  // create a mesh
-  const createMesh = (flower) => {
-    const program = new Program(gl, {
-      cullFace: null,
+  const flowerSetOneTextures = createTextureSets(flowerSetOneSources);
+  const flowerSetTwoTextures = createTextureSets(flowerSetTwoSources);
+
+  const sets = [
+    {
+      building: "/building.gltf",
+      textures: flowerSetOneTextures,
+    },
+    {
+      building: "/building.gltf",
+      textures: flowerSetTwoTextures,
+    },
+  ];
+
+  let activeMeshes = [];
+  let activeBuilding;
+  let activeTextures;
+
+  function selectSet(index = 0) {
+    const set = sets[index];
+
+    activeTextures = set.textures;
+
+    gltfLoader.load(set.building, (gltf) => {
+      activeBuilding = gltf.scene;
+      activeBuilding.name = "building";
+      activeBuilding.position.x = 2.25;
+      activeBuilding.position.y = -0.75;
+      scene.add(activeBuilding);
+    });
+  }
+
+  selectSet();
+
+  // gemetry
+  const geometry = new THREE.PlaneGeometry(1, 1);
+
+  // create mesh
+  const createMesh = (texture) => {
+    const material = new THREE.RawShaderMaterial({
       depthTest: false,
       depthWrite: false,
       transparent: true,
-      vertex: `
-        attribute vec2 uv;
-        attribute vec3 position;
-
-        uniform mat4 modelViewMatrix;
+      vertexShader: `
         uniform mat4 projectionMatrix;
+        uniform mat4 viewMatrix;
+        uniform mat4 modelMatrix;
+
+        attribute vec3 position;
+        attribute vec2 uv;
+        varying vec2 vUv;
+
+        void main() {
+          gl_Position = projectionMatrix * viewMatrix * modelMatrix * vec4(position, 1.0);
+          vUv = uv;
+        }
+      `,
+      fragmentShader: `
+        precision highp float;
+
+        uniform sampler2D tMap;
+        uniform float uAlpha;
 
         varying vec2 vUv;
 
         void main() {
-          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
-          vUv = uv;
+          vec4 tex2d = texture2D(tMap, vUv);
+          if (tex2d.a < 0.1) discard;
+          gl_FragColor = vec4(tex2d.rgb, uAlpha);
         }
       `,
-      fragment: `
-          precision highp float;
-  
-          uniform sampler2D tMap;
-          uniform float uAlpha;
-
-          varying vec2 vUv;
-  
-          void main() {
-            vec4 tex2d = texture2D(tMap, vUv);
-            if (tex2d.a < 0.1) discard;
-            gl_FragColor = vec4(tex2d.rgb, uAlpha);
-          }
-      `,
       uniforms: {
-        tMap: { value: flower },
+        tMap: { value: texture },
         uAlpha: { value: 1.0 },
       },
     });
 
-    const mesh = new Mesh(gl, { geometry, program });
-
-    return { mesh, program };
+    return new THREE.Mesh(geometry, material);
   };
 
   /**
@@ -223,15 +246,24 @@ const mapRange = (value, inMin, inMax, outMin, outMax) => {
   async function update(t = 0) {
     stats.begin();
 
-    renderer.render({ scene, camera });
+    renderer.render(scene, camera);
 
-    if (!testing) {
+    if (sceneIsChanging) {
+      requestAnimationFrame(update);
+      return;
+    }
+
+    if (testing) {
+      setMeshPosition({
+        x: mouse.x,
+        y: mouse.y,
+        id: 0,
+        name: "mouse",
+      });
+    } else {
       const people = await detector.estimatePoses(video);
 
-      people.forEach((person, index) => {
-        // const nose = filterParts(person, "nose");
-        // nose && addMeshToCanvas(nose);
-
+      people.forEach((person) => {
         const leftWrist = filterParts(person, "left_wrist");
         leftWrist && setMeshPosition(leftWrist);
 
@@ -248,6 +280,7 @@ const mapRange = (value, inMin, inMax, outMin, outMax) => {
   function setMeshPosition({ x, y, id, name }) {
     const mappedX = mapRange(x, 0, 640, 0, viewport.width);
     const mappedY = mapRange(y, 0, 480, 0, viewport.height);
+    if (mappedX > viewport.width || mappedY > viewport.height) return;
     const posX = (mappedX / viewport.width) * clipspace.width;
     const posY = (mappedY / viewport.height) * clipspace.height;
 
@@ -261,23 +294,40 @@ const mapRange = (value, inMin, inMax, outMin, outMax) => {
       existingPerson = new VisiblePerson(name + id);
     }
 
-    /** THROTTLING ON HOLD **************************** 
+    const clipspaceX = posX - clipspace.width * 0.5;
+    const clipspaceY = -1 * (posY - clipspace.height * 0.5);
+
+    // check if on top of architecture
+    let threshold = 100;
+    let temporaryFlower = false;
+
+    if (
+      personIsOnArchitecture({
+        x: (mappedX / viewport.width) * 2 - 1,
+        y: -1 * ((mappedY / viewport.height) * 2 - 1),
+      })
+    ) {
+      temporaryFlower = true;
+    }
+
+    // throttling
+
     // if the person is in throttle we return
     if (existingPerson.throttle) {
       return;
     }
 
-    // else we set the throttle to true and give it 50ms threshold
+    // else we set the throttle to true and pass in a threshold before next draw
     existingPerson.throttle = true;
-    setTimeout(() => (existingPerson.throttle = false), 15);
-    
-    THROTTLING ON HOLD ********************************/
+    setTimeout(() => (existingPerson.throttle = false), threshold);
+
     // we also check if the person has not moved
     if (
-      (existingPerson.lastPosition.x <= x + 3 &&
+      !testing &&
+      ((existingPerson.lastPosition.x <= x + 3 &&
         existingPerson.lastPosition.x >= x - 3) ||
-      (existingPerson.lastPosition.y <= y + 3 &&
-        existingPerson.lastPosition.y >= y - 3)
+        (existingPerson.lastPosition.y <= y + 3 &&
+          existingPerson.lastPosition.y >= y - 3))
     ) {
       return;
     }
@@ -289,29 +339,72 @@ const mapRange = (value, inMin, inMax, outMin, outMax) => {
     visiblePeople.push(existingPerson);
 
     // and finally addMeshToCanvas
-    addMeshToCanvas(posX, posY);
+    addMeshToCanvas(clipspaceX, clipspaceY, temporaryFlower);
   }
 
-  function addMeshToCanvas(x, y) {
-    // find a random flower
+  function personIsOnArchitecture(personsPosition) {
+    raycaster.setFromCamera(personsPosition, camera);
+
+    if (!activeBuilding) return;
+
+    const intersects = raycaster.intersectObject(activeBuilding);
+    for (const intersect of intersects) {
+      return intersect;
+    }
+  }
+
+  function addMeshToCanvas(x, y, isTemporary) {
+    // find a random flower material
     const flower =
-      flowerTextures[Math.floor(Math.random() * flowerTextures.length)];
+      activeTextures[Math.floor(Math.random() * activeTextures.length)];
 
     // create the mesh and add it to the texture
-    const { mesh, program } = createMesh(flower);
+    const mesh = createMesh(flower);
+    activeMeshes.push(mesh);
     mesh.scale.set(0.0);
-    mesh.setParent(scene);
-    mesh.position.x = x - clipspace.width * 0.5;
-    mesh.position.y = -1 * (y - clipspace.height * 0.5);
+    scene.add(mesh);
 
-    // entrance and exit
-    gsap.to(mesh.scale, { x: 1, y: 1, z: 1, duration: 0.15 });
-    gsap.to(program.uniforms.uAlpha, {
+    mesh.position.x = x;
+    mesh.position.y = y;
+
+    // entrance
+    gsap.to(mesh.scale, { x: 0.5, y: 0.5, z: 0.5, duration: 0.15 });
+
+    // exit
+    gsap.to(mesh.material.uniforms.uAlpha, {
       value: 0,
       ease: "Power3.easeIn",
-      delay: 3,
+      delay: isTemporary ? 1 : 15,
       onComplete: () => {
-        scene.removeChild(mesh);
+        mesh.material.dispose();
+        scene.remove(mesh);
+      },
+    });
+  }
+
+  /* Change to new scene (new Architecture and flower set) */
+  let sceneIsChanging = true;
+  let activeScene = 0;
+
+  function changeScene() {
+    sceneIsChanging = true;
+    gsap.to(canvas, {
+      opacity: 0,
+      onComplete: () => {
+        activeMeshes.forEach((mesh) => {
+          mesh.material.dispose();
+          scene.remove(mesh);
+        });
+        scene.remove(activeBuilding);
+        selectSet(activeScene);
+        console.log(activeScene);
+        activeScene = sets.length - 1 ? 0 : activeScene + 1;
+        setTimeout(() => {
+          gsap.to(canvas, {
+            opacity: 1,
+            onComplete: () => (sceneIsChanging = false),
+          });
+        }, 5000);
       },
     });
   }
@@ -319,11 +412,15 @@ const mapRange = (value, inMin, inMax, outMin, outMax) => {
   if (testing) {
     update();
     window.addEventListener("mousemove", (e) => {
-      mouse.x = (e?.clientX / viewport.width) * clipspace.width;
-      mouse.y = (e?.clientY / viewport.height) * clipspace.height;
-      addMeshToCanvas(mouse);
+      mouse.x = e?.clientX || 0;
+      mouse.y = e?.clientY || 0;
     });
+    changeScene();
+    setInterval(changeScene, 1000 * 120);
   } else {
-    video.addEventListener("loadeddata", update);
+    update();
+    //video.addEventListener("loadeddata", update);
   }
+
+  window.scene = scene;
 })();

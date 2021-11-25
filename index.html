@@ -11,18 +11,22 @@
         padding: 0;
       }
       video {
-        /* opacity: 0; */
+        opacity: 0;
         pointer-events: 0;
         object-fit: cover;
         object-position: center;
         transform: scaleX(-1);
-      }
-      #canvas {
-        opacity: 0.9;
+        z-index: 999;
         position: fixed;
         top: 0;
         left: 0;
-        z-index: 999;
+      }
+      #canvas {
+        opacity: 1;
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 998;
         transform: scaleX(-1);
       }
       img {
@@ -35,6 +39,15 @@
         width: 100px;
         height: 42px;
         z-index: 999;
+      }
+      .total {
+        position: absolute;
+        color: white;
+        top: 60px;
+        left: 60px;
+        z-index: 999;
+        font-family: Arial, Helvetica, sans-serif;
+        font-size: 42px;
       }
     </style>
   </head>
