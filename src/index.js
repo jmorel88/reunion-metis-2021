@@ -259,8 +259,8 @@ export default class Installation {
   }
 
   personIsOnArchitecture({ x, y }) {
-    const d = document.elementFromPoint(x, y);
-    return d && d.id === "foreground";
+    const isOverElement = document.elementFromPoint(x, y);
+    return isOverElement && isOverElement.id === "foreground";
   }
 
   addMeshToCanvas(x, y, isTemporary) {
