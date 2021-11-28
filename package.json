@@ -14,9 +14,7 @@
     "@tensorflow/tfjs-backend-webgl": "^3.9.0",
     "@tensorflow/tfjs-converter": "^3.9.0",
     "@tensorflow/tfjs-core": "^3.9.0",
-    "dat.gui": "^0.7.7",
     "gsap": "^3.8.0",
-    "lodash.debounce": "^4.0.8",
     "stats.js": "^0.17.0",
     "three": "^0.134.0"
   }
