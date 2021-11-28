@@ -8,6 +8,10 @@ import fragmentShader from "./shaders/fragment.glsl?raw";
 
 import buildingOneBackground from "./sets/set-0.jpg";
 import buildingOneForeground from "./sets/set-0.svg?raw";
+import buildingTwoBackground from "./sets/set-1.jpg";
+import buildingTwoForeground from "./sets/set-1.svg?raw";
+import buildingThreeBackground from "./sets/set-2.jpg";
+import buildingThreeForeground from "./sets/set-2.svg?raw";
 
 /* Add stats to DOM */
 export const addStats = () => {
@@ -46,6 +50,8 @@ export default class Installation {
     this.sceneIsChanging = false;
     this.people = [];
     this.meshes = [];
+    this.activeSet = 0;
+    this.set = null;
 
     this.textureLoader = new THREE.TextureLoader();
     this.geometry = new THREE.PlaneGeometry(1, 1);
@@ -73,6 +79,8 @@ export default class Installation {
           foreground: buildingOneForeground,
         },
         textures: this.initFlowerSet([
+          `/flower-1.png`,
+          `/flower-2.png`,
           `/flower-3.png`,
           `/flower-4.png`,
           `/flower-5.png`,
@@ -80,18 +88,32 @@ export default class Installation {
       },
       {
         building: {
-          background: buildingOneBackground,
-          foreground: buildingOneForeground,
+          background: buildingTwoBackground,
+          foreground: buildingTwoForeground,
         },
         textures: this.initFlowerSet([
-          `/flower-1.png`,
-          `/flower-2.png`,
-          `/flower-3.png`,
+          `/flower-6.png`,
+          `/flower-7.png`,
+          `/flower-8.png`,
+          `/flower-9.png`,
+          `/flower-10.png`,
+        ]),
+      },
+      {
+        building: {
+          background: buildingThreeBackground,
+          foreground: buildingThreeForeground,
+        },
+        textures: this.initFlowerSet([
+          `/flower-12.png`,
+          `/flower-12.png`,
+          `/flower-13.png`,
+          `/flower-14.png`,
+          `/flower-15.png`,
         ]),
       },
     ];
 
-    this.activeSet = 0;
     this.set = this.sets[this.activeSet];
 
     // init parts
@@ -102,7 +124,7 @@ export default class Installation {
     this.resizer = this.initResize();
 
     // start
-    const durationOfSet = 1000 * 60 * 5; // 5 minutes
+    const durationOfSet = 1000 * 60 * 1; // 5 minutes
     this.video.addEventListener("loadeddata", this.update);
     setInterval(this.changeSet, durationOfSet);
     this.changeSet();
@@ -205,7 +227,7 @@ export default class Installation {
     const mappedX = gsap.utils.mapRange(0, 640, 0, this.viewport.width, x);
     const mappedY = gsap.utils.mapRange(0, 480, 0, this.viewport.height, y);
 
-    // not in bounds
+    // if person is not in bounds, return
     if (mappedX > this.viewport.width || mappedY > this.viewport.height) return;
 
     // check for existing person
@@ -215,18 +237,6 @@ export default class Installation {
     if (!existingPerson) {
       existingPerson = new Person(name + id);
     }
-
-    // calc position in clipspace
-    const zeroToOneX = (mappedX / this.viewport.width) * this.clipspace.width;
-    const zeroToOneY = (mappedY / this.viewport.height) * this.clipspace.height;
-    const clipspaceX = zeroToOneX - this.clipspace.width * 0.5;
-    const clipspaceY = -1 * (zeroToOneY - this.clipspace.height * 0.5);
-
-    // check if on top of architecture
-    let temporaryFlower = this.personIsOnArchitecture({
-      x: mappedX,
-      y: mappedY,
-    });
 
     // if the person is in throttle we return
     if (existingPerson.throttle) {
@@ -238,7 +248,7 @@ export default class Installation {
     existingPerson.throttle = true;
     setTimeout(() => (existingPerson.throttle = false), threshold);
 
-    // we also check if the person has not moved
+    // if the person has not moved we return
     if (
       (existingPerson.lastPosition.x <= x + 3 &&
         existingPerson.lastPosition.x >= x - 3) ||
@@ -254,6 +264,18 @@ export default class Installation {
     // cache the data
     this.people.push(existingPerson);
 
+    // calc position in clipspace
+    const zeroToOneX = (mappedX / this.viewport.width) * this.clipspace.width;
+    const zeroToOneY = (mappedY / this.viewport.height) * this.clipspace.height;
+    const clipspaceX = zeroToOneX - this.clipspace.width * 0.5;
+    const clipspaceY = -1 * (zeroToOneY - this.clipspace.height * 0.5);
+
+    // check if person is on top of architecture
+    let temporaryFlower = this.personIsOnArchitecture({
+      x: mappedX,
+      y: mappedY,
+    });
+
     // and finally addMeshToCanvas
     this.addMeshToCanvas(clipspaceX, clipspaceY, temporaryFlower);
   }
@@ -268,7 +290,7 @@ export default class Installation {
     const flower =
       this.set.textures[Math.floor(Math.random() * this.set.textures.length)];
 
-    // create the mesh and add it to the texture
+    // create the mesh
     const mesh = this.createMesh(flower);
     mesh.scale.set(0.0);
     mesh.position.x = x;
@@ -278,7 +300,7 @@ export default class Installation {
     this.scene.add(mesh);
 
     // entrance
-    let scale = 0.5;
+    let scale = 0.35;
     gsap.to(mesh.scale, { x: scale, y: scale, z: scale, duration: 0.15 });
 
     // exit
