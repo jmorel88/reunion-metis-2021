@@ -1,6 +1,8 @@
-import * as poseDetection from "@tensorflow-models/pose-detection";
-import "@tensorflow/tfjs-backend-webgl";
 import Stats from "stats.js";
+
+const worker = new Worker("./workers/tf.worker.js", {
+  type: "module",
+});
 
 const stats = new Stats();
 stats.showPanel(0);
@@ -31,21 +33,34 @@ const mapRange = (value, inMin, inMax, outMin, outMax) => {
   const visiblePeople = [];
 
   /**
-   * Stream camera to video
+   * Stream camera to video and offload to canvas for webworker
+   * there's no other way to pass the webcam data to the web worker
    */
   const video = document.getElementById("video");
-  const stream = await navigator.mediaDevices.getUserMedia({ video: true });
-  video.srcObject = stream;
+  const webcam = await navigator.mediaDevices.getUserMedia({
+    video: true,
+    audio: false,
+  });
+  video.srcObject = webcam;
+  const offscreenCanvas = document.createElement("canvas");
+  offscreenCanvas.width = 640;
+  offscreenCanvas.height = 480;
+  const offscreenCtx = offscreenCanvas.getContext("2d");
+
+  const drawToOffscreen = function () {
+    offscreenCtx.drawImage(video, 0, 0);
+    const imageData = offscreenCtx.getImageData(0, 0, 640, 480);
+    return imageData;
+  };
 
   /**
    * Canvas
    */
   const canvas = document.getElementById("canvas");
   const ctx = canvas.getContext("2d");
-  const dpr = Math.min(window.devicePixelRatio, 2);
-  canvas.width = viewport.width * dpr;
-  canvas.height = viewport.height * dpr;
-  ctx.scale(dpr, dpr);
+  canvas.width = viewport.width;
+  canvas.height = viewport.height;
+
   /**
    * Resize
    */
@@ -146,7 +161,7 @@ const mapRange = (value, inMin, inMax, outMin, outMax) => {
     // cache the data
     visiblePeople.push(existingPerson);
 
-    paintImageToCanvas(x, y, temporaryFlower);
+    paintImageToCanvas(mappedX, mappedY, temporaryFlower);
   };
 
   const paintImageToCanvas = (x, y, isTemp) => {
@@ -165,78 +180,22 @@ const mapRange = (value, inMin, inMax, outMin, outMax) => {
   };
 
   /**
-   * MoveNet
-   */
-  const detectorConfig = {
-    modelType: poseDetection.movenet.modelType.MULTIPOSE_LIGHTNING,
-    enableTracking: true,
-    minPoseScore: 0.3,
-  };
-
-  const detector = await poseDetection.createDetector(
-    poseDetection.SupportedModels.MoveNet,
-    detectorConfig
-  );
-
-  /**
    * Render
    */
-  const filterParts = (person, part) => {
-    const points = person.keypoints.find((point) => point.name === part);
-
-    if (!points) return;
-
-    return {
-      x: points.x,
-      y: points.y,
-      id: person.id,
-      name: points.name,
-    };
-  };
 
   const render = async () => {
     stats.begin();
-
-    // if (sceneIsChanging) {
-    //   requestAnimationFrame(update);
-    //   return;
-    // }
-
-    const people = await detector.estimatePoses(video);
-
-    people.forEach((person, index) => {
-      const leftWrist = filterParts(person, "left_wrist");
-      leftWrist && positionImage(leftWrist);
-
-      const rightWrist = filterParts(person, "right_wrist");
-      rightWrist && positionImage(rightWrist);
-    });
-
+    const imageData = drawToOffscreen();
+    worker.postMessage({ imageData });
     stats.end();
-
     requestAnimationFrame(render);
   };
 
-  video.addEventListener("loadeddata", render);
+  video.onloadeddata = render;
 
-  /**
-   * Testing
-   */
-  const pause = document.getElementById("pause");
-
-  pause.addEventListener("click", () => {
-    ctx.clearRect(0, 0, viewport.width, viewport.height);
-  });
-
-  // const mouse = {
-  //   x: 0,
-  //   y: 0,
-  // };
-
-  // window.addEventListener("mousemove", (e) => {
-  //   mouse.x = e?.clientX;
-  //   mouse.y = e?.clientY;
-  //   console.log(mouse);
-  //   positionImage(mouse);
-  // });
+  worker.onmessage = (e) => {
+    const { leftWrist, rightWrist } = e.data;
+    leftWrist && positionImage(leftWrist);
+    rightWrist && positionImage(rightWrist);
+  };
 })();
