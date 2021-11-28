@@ -6,7 +6,7 @@ import * as THREE from "three";
 import { GLTFLoader } from "three/examples/jsm/loaders/GLTFLoader";
 import { DRACOLoader } from "three/examples/jsm/loaders/DRACOLoader";
 
-const testing = true;
+const testing = false;
 
 const stats = new Stats();
 stats.showPanel(0);
@@ -416,10 +416,11 @@ const mapRange = (value, inMin, inMax, outMin, outMax) => {
       mouse.y = e?.clientY || 0;
     });
     changeScene();
-    setInterval(changeScene, 1000 * 120);
+    //setInterval(changeScene, 1000 * 120);
   } else {
-    update();
-    //video.addEventListener("loadeddata", update);
+    //update();
+    changeScene();
+    video.addEventListener("loadeddata", update);
   }
 
   window.scene = scene;
