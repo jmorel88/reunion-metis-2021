@@ -105,7 +105,7 @@ export default class Installation {
           foreground: buildingThreeForeground,
         },
         textures: this.initFlowerSet([
-          `/flower-12.png`,
+          `/flower-11.png`,
           `/flower-12.png`,
           `/flower-13.png`,
           `/flower-14.png`,
@@ -124,7 +124,7 @@ export default class Installation {
     this.resizer = this.initResize();
 
     // start
-    const durationOfSet = 1000 * 60 * 1; // 5 minutes
+    const durationOfSet = 1000 * 60 * 5; // 5 minutes
     this.video.addEventListener("loadeddata", this.update);
     setInterval(this.changeSet, durationOfSet);
     this.changeSet();
