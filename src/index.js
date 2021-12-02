@@ -6,12 +6,12 @@ import Stats from "stats.js";
 import vertexShader from "./shaders/vertex.glsl?raw";
 import fragmentShader from "./shaders/fragment.glsl?raw";
 
-import buildingOneBackground from "./sets/set-0.jpg";
-import buildingOneForeground from "./sets/set-0.svg?raw";
-import buildingTwoBackground from "./sets/set-1.jpg";
-import buildingTwoForeground from "./sets/set-1.svg?raw";
-import buildingThreeBackground from "./sets/set-2.jpg";
-import buildingThreeForeground from "./sets/set-2.svg?raw";
+import buildingOneBackground from "./sets/set-1.jpg";
+import buildingOneForeground from "./sets/set-1.svg?raw";
+import buildingTwoBackground from "./sets/set-2.jpg";
+import buildingTwoForeground from "./sets/set-2.svg?raw";
+import buildingThreeBackground from "./sets/set-3.jpg";
+import buildingThreeForeground from "./sets/set-3.svg?raw";
 
 /* Add stats to DOM */
 export const addStats = () => {
@@ -79,6 +79,19 @@ export default class Installation {
           foreground: buildingOneForeground,
         },
         textures: this.initFlowerSet([
+          `/flower-11.png`,
+          `/flower-12.png`,
+          `/flower-13.png`,
+          `/flower-14.png`,
+          `/flower-15.png`,
+        ]),
+      },
+      {
+        building: {
+          background: buildingTwoBackground,
+          foreground: buildingTwoForeground,
+        },
+        textures: this.initFlowerSet([
           `/flower-1.png`,
           `/flower-2.png`,
           `/flower-3.png`,
@@ -88,8 +101,8 @@ export default class Installation {
       },
       {
         building: {
-          background: buildingTwoBackground,
-          foreground: buildingTwoForeground,
+          background: buildingThreeBackground,
+          foreground: buildingThreeForeground,
         },
         textures: this.initFlowerSet([
           `/flower-6.png`,
@@ -97,19 +110,6 @@ export default class Installation {
           `/flower-8.png`,
           `/flower-9.png`,
           `/flower-10.png`,
-        ]),
-      },
-      {
-        building: {
-          background: buildingThreeBackground,
-          foreground: buildingThreeForeground,
-        },
-        textures: this.initFlowerSet([
-          `/flower-11.png`,
-          `/flower-12.png`,
-          `/flower-13.png`,
-          `/flower-14.png`,
-          `/flower-15.png`,
         ]),
       },
     ];
@@ -124,7 +124,7 @@ export default class Installation {
     this.resizer = this.initResize();
 
     // start
-    const durationOfSet = 1000 * 60 * 5; // 5 minutes
+    const durationOfSet = 1000 * 60 * 3; // 5 minutes
     this.video.addEventListener("loadeddata", this.update);
     setInterval(this.changeSet, durationOfSet);
     this.changeSet();
@@ -224,8 +224,21 @@ export default class Installation {
   }
 
   setMeshPosition({ x, y, id, name }) {
-    const mappedX = gsap.utils.mapRange(0, 640, 0, this.viewport.width, x);
-    const mappedY = gsap.utils.mapRange(0, 480, 0, this.viewport.height, y);
+    const multi = Math.random() * 100 + -50;
+    const mappedX = gsap.utils.mapRange(
+      0,
+      640,
+      0,
+      this.viewport.width,
+      x + multi
+    );
+    const mappedY = gsap.utils.mapRange(
+      0,
+      480,
+      0,
+      this.viewport.height,
+      y + multi
+    );
 
     // if person is not in bounds, return
     if (mappedX > this.viewport.width || mappedY > this.viewport.height) return;
@@ -300,7 +313,7 @@ export default class Installation {
     this.scene.add(mesh);
 
     // entrance
-    let scale = 0.35;
+    let scale = Math.max(0.35, Math.random() * 0.85);
     gsap.to(mesh.scale, { x: scale, y: scale, z: scale, duration: 0.15 });
 
     // exit
