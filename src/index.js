@@ -50,7 +50,7 @@ export default class Installation {
     this.sceneIsChanging = false;
     this.people = [];
     this.meshes = [];
-    this.activeSet = 0;
+    this.activeSet = 1;
     this.set = null;
 
     this.textureLoader = new THREE.TextureLoader();
@@ -58,6 +58,7 @@ export default class Installation {
 
     this.update = this.update.bind(this);
     this.changeSet = this.changeSet.bind(this);
+    this.addAttractorFlower = this.addAttractorFlower.bind(this);
   }
 
   async init() {
@@ -122,12 +123,16 @@ export default class Installation {
     this.scene = this.initScene();
     this.camera = this.initCamera();
     this.resizer = this.initResize();
+    this.overlay = this.initOverlay();
 
     // start
-    const durationOfSet = 1000 * 60 * 3; // 5 minutes
+    const durationOfSet = 1000 * 60 * 3; // 3 minutes
     this.video.addEventListener("loadeddata", this.update);
     setInterval(this.changeSet, durationOfSet);
     this.changeSet();
+
+    // attract
+    setInterval(this.addAttractorFlower, 1000 * 3);
   }
 
   initFlowerSet(images) {
@@ -171,6 +176,28 @@ export default class Installation {
     return camera;
   }
 
+  initOverlay() {
+    const overlay = document.getElementById("overlay");
+
+    const tween = gsap.to(overlay, {
+      opacity: 0,
+      duration: 1.2,
+      ease: "Power3.easeInOut",
+      paused: true,
+    });
+
+    return {
+      hide: () => {
+        this.overlayHidden = true;
+        tween.play();
+      },
+      show: () => {
+        this.overlayHidden = false;
+        tween.reverse();
+      },
+    };
+  }
+
   initResize() {
     const resize = () => {
       this.viewport.width = window.innerWidth;
@@ -203,12 +230,24 @@ export default class Installation {
     this.renderer.render(this.scene, this.camera);
 
     if (this.sceneIsChanging) {
-      requestAnimationFrame(this.update);
       this.stats && this.stats.end();
+      requestAnimationFrame(this.update);
       return;
     }
 
     const foundPeople = await this.detector.estimatePoses(this.video);
+
+    // handle overlay
+    if (!foundPeople.length && this.overlayHidden) {
+      this.overlayHidden = false;
+      this.overlayTO = setTimeout(() => this.overlay.show(), 1000 * 30);
+      this.stats && this.stats.end();
+      requestAnimationFrame(this.update);
+      return;
+    } else if (foundPeople.length && !this.overlayHidden) {
+      clearTimeout(this.overlayTO);
+      this.overlay.hide();
+    }
 
     foundPeople.forEach((person) => {
       const leftWrist = this.filterParts(person, "left_wrist");
@@ -224,7 +263,8 @@ export default class Installation {
   }
 
   setMeshPosition({ x, y, id, name }) {
-    const multi = Math.random() * 100 + -50;
+    const multi = Math.random() * 30 + -15;
+
     const mappedX = gsap.utils.mapRange(
       0,
       640,
@@ -232,6 +272,7 @@ export default class Installation {
       this.viewport.width,
       x + multi
     );
+
     const mappedY = gsap.utils.mapRange(
       0,
       480,
@@ -328,6 +369,34 @@ export default class Installation {
     });
   }
 
+  addAttractorFlower() {
+    if (this.sceneIsChanging) return;
+
+    const mappedX = gsap.utils.mapRange(
+      0,
+      640,
+      0,
+      this.viewport.width,
+      640 * Math.random()
+    );
+
+    const mappedY = gsap.utils.mapRange(
+      0,
+      480,
+      0,
+      this.viewport.height,
+      480 * Math.random()
+    );
+
+    // calc position in clipspace
+    const zeroToOneX = (mappedX / this.viewport.width) * this.clipspace.width;
+    const zeroToOneY = (mappedY / this.viewport.height) * this.clipspace.height;
+    const x = zeroToOneX - this.clipspace.width * 0.5;
+    const y = -1 * (zeroToOneY - this.clipspace.height * 0.5);
+
+    this.addMeshToCanvas(x, y, false);
+  }
+
   createMesh(texture) {
     const material = new THREE.RawShaderMaterial({
       depthTest: false,
@@ -360,6 +429,8 @@ export default class Installation {
   changeSet() {
     this.sceneIsChanging = true;
 
+    this.overlay.show();
+
     gsap.to([this.renderer.domElement, this.background], {
       opacity: 0,
       duration: 2,
@@ -378,7 +449,7 @@ export default class Installation {
             duration: 2,
             onComplete: () => (this.sceneIsChanging = false),
           });
-        }, 5000);
+        }, 3000);
       },
     });
   }
